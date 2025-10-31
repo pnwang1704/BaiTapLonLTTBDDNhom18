@@ -3,6 +3,7 @@ import { Redirect } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
 
 import { Alert, BackHandler, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "../../contexts/AuthContext";
 export default function AccountScreen() {
   const { isAuthenticated, user, logout } = useAuth();
@@ -57,9 +58,7 @@ export default function AccountScreen() {
         <View style={{ width: 36 }} />
       )}
       <Text style={styles.topbarTitle}>{title}</Text>
-      <Pressable onPress={logout} style={styles.logoutBtn}>
-        <Ionicons name="log-out-outline" size={18} color="#FF3B30" />
-      </Pressable>
+      
     </View>
   );
 
@@ -354,7 +353,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <View style={styles.screen}>
+    <SafeAreaView style={styles.screen}>
       <Header title={viewTitle[currentView]} />
       {currentView !== "home" && (
         <View style={styles.breadcrumbsWrap}>
@@ -423,7 +422,7 @@ export default function AccountScreen() {
           <Personal />
         </ScrollView>
       )}
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -440,7 +439,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
-  topbarTitle: { fontSize: 16, fontWeight: "700", color: "#111" },
+  topbarTitle: { fontSize: 16, fontWeight: "700", color: "#111", textAlign: "left"},
   breadcrumbsWrap: { paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F2F2F7", backgroundColor: "#fff" },
   breadcrumbs: { flexDirection: "row", alignItems: "center", gap: 8 },
   breadcrumbLink: { color: "#007AFF", fontWeight: "600" },

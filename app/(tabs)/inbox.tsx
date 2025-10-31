@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  BackHandler,
   FlatList,
   Pressable,
   RefreshControl,
@@ -9,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 type Thread = {
   id: string;
@@ -129,9 +131,21 @@ export default function InboxScreen() {
     setMessageText("");
   };
 
+  // Android hardware back → quay về list khi đang trong thread
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (currentThreadId) {
+        setCurrentThreadId(null);
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [currentThreadId]);
+
   if (currentThread) {
     return (
-      <View style={styles.container}>
+      <SafeAreaView style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backBtn} onPress={() => setCurrentThreadId(null)}>
@@ -139,6 +153,17 @@ export default function InboxScreen() {
           </Pressable>
           <Text style={styles.headerTitle} numberOfLines={1}>{currentThread.title}</Text>
           <View style={{ width: 36 }} />
+        </View>
+
+        {/* Breadcrumbs */}
+        <View style={styles.breadcrumbsWrap}>
+          <View style={styles.breadcrumbs}>
+            <Pressable onPress={() => setCurrentThreadId(null)}>
+              <Text style={styles.breadcrumbLink}>Inbox</Text>
+            </Pressable>
+            <Text style={styles.breadcrumbSep}>›</Text>
+            <Text style={styles.breadcrumbCur} numberOfLines={1}>{currentThread.title}</Text>
+          </View>
         </View>
 
         {/* Messages */}
@@ -166,13 +191,13 @@ export default function InboxScreen() {
             <Ionicons name="send" size={18} color="#fff" />
           </Pressable>
         </View>
-      </View>
+      </SafeAreaView>
     );
   }
 
   // List view
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Inbox</Text>
@@ -223,7 +248,7 @@ export default function InboxScreen() {
           </View>
         )}
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -243,6 +268,11 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   markReadBtn: { flexDirection: "row", alignItems: "center", gap: 6 },
   markReadText: { color: "#007AFF", fontWeight: "700" },
+  breadcrumbsWrap: { paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F2F2F7", backgroundColor: "#fff" },
+  breadcrumbs: { flexDirection: "row", alignItems: "center", gap: 8 },
+  breadcrumbLink: { color: "#007AFF", fontWeight: "600" },
+  breadcrumbSep: { color: "#8E8E93" },
+  breadcrumbCur: { color: "#111", fontWeight: "700", flex: 1 },
 
   searchRow: {
     margin: 16,
@@ -271,6 +301,7 @@ const styles = StyleSheet.create({
   threadLast: { color: "#6B7280", marginTop: 4 },
   unreadBadge: { backgroundColor: "#FF3B30", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 },
   unreadText: { color: "#fff", fontSize: 12, fontWeight: "700" },
+  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
 
   bubble: { maxWidth: "80%", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   bubbleMe: { alignSelf: "flex-end", backgroundColor: "#007AFF" },
