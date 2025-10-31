@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import Animated, { FadeIn, Layout, withSpring } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Logo from '../../assets/images/logo.png';
 import { useCartStore } from '../../store/cartStore';
 
 const { width } = Dimensions.get('window');
@@ -244,21 +245,30 @@ export default function AllDealsScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>All Deals</Text>
-        <View style={styles.headerRight}>
-          <TouchableOpacity onPress={() => router.push('/cart')} style={styles.cartBtn}>
-            <Ionicons name="cart-outline" size={26} color="#000" />
-            {totalItems > 0 && (
-              <View style={styles.badgeCart}>
-                <Text style={styles.badgeText}>{totalItems}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <Image source={{ uri: IMG.avatar }} style={styles.avatar} />
+   {/* Header - LOGO GÓC TRÁI + CART + AVATAR */}
+<View style={styles.header}>
+  {/* LOGO GÓC TRÁI */}
+  <View style={styles.logoLeft}>
+    <Image 
+      source={Logo} 
+      style={styles.logo} 
+      resizeMode="contain"
+    />
+  </View>
+
+  {/* PHẦN PHẢI: CART + AVATAR */}
+  <View style={styles.headerRight}>
+    <TouchableOpacity onPress={() => router.push('/cart')} style={styles.cartBtn}>
+      <Ionicons name="cart-outline" size={26} color="#000" />
+      {totalItems > 0 && (
+        <View style={styles.badgeCart}>
+          <Text style={styles.badgeText}>{totalItems}</Text>
         </View>
-      </View>
+      )}
+    </TouchableOpacity>
+    <Image source={{ uri: IMG.avatar }} style={styles.avatar} />
+  </View>
+</View>
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -332,9 +342,23 @@ export default function AllDealsScreen() {
 // === STYLES ===
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F9FA' },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 16 },
+  header: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  paddingHorizontal: 16,
+  paddingVertical: 12,
+  backgroundColor: '#fff',
+  borderBottomWidth: 1,
+  borderBottomColor: '#eee',
+},
+headerRight: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  gap: 14,
+},
   headerTitle: { fontSize: 18, fontWeight: '600', color: '#2D3436' },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+
   cartBtn: { position: 'relative' },
   badgeCart: { position: 'absolute', right: -8, top: -5, backgroundColor: '#E91E63', borderRadius: 10, width: 18, height: 18, justifyContent: 'center', alignItems: 'center' },
   badgeText: { color: '#fff', fontSize: 11, fontWeight: 'bold' },
@@ -390,4 +414,23 @@ const styles = StyleSheet.create({
   emptyContainer: { padding: 40, alignItems: 'center' },
   emptyText: { fontSize: 16, color: '#8E8E93', marginBottom: 4 },
   emptySubtext: { fontSize: 14, color: '#AAA' },
+
+  logoContainer: {
+  position: 'absolute',
+  left: 0,
+  right: 0,
+  top: 0,
+  bottom: 0,
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1,
+},
+logo: {
+  width: 100,        // Tùy chỉnh theo logo của bạn
+  height: 60,        // Giữ tỉ lệ
+},
+logoLeft: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
 });
