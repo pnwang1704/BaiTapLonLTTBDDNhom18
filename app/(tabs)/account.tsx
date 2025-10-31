@@ -1,8 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Redirect } from "expo-router";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import { Alert, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import { Alert, BackHandler, FlatList, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
 import { useAuth } from "../../contexts/AuthContext";
 export default function AccountScreen() {
   const { isAuthenticated, user, logout } = useAuth();
@@ -24,6 +24,18 @@ export default function AccountScreen() {
 
   const [currentView, setCurrentView] = useState<ViewKey>("home");
   const [searchChat, setSearchChat] = useState("");
+
+  // Android hardware back → quay về trang home của Account
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (currentView !== "home") {
+        setCurrentView("home");
+        return true;
+      }
+      return false;
+    });
+    return () => sub.remove();
+  }, [currentView]);
 
   const MenuItem = ({ icon, color, label, onPress }: { icon: any; color: string; label: string; onPress?: () => void }) => (
     <Pressable style={styles.menuItem} onPress={onPress}>
@@ -278,7 +290,7 @@ export default function AccountScreen() {
           <Ionicons name="person-outline" size={28} color="#fff" />
         </View>
         <View>
-          <Text style={styles.itemTitle}>{user?.name ?? "Người dùng"}</Text>
+          <Text style={styles.itemTitle}>{user?.name ?? "Quốc Thái"}</Text>
           <Text style={styles.itemSub}>SĐT: {user?.phone}</Text>
         </View>
       </View>
@@ -293,7 +305,7 @@ export default function AccountScreen() {
           <Ionicons name="person-outline" size={32} color="#fff" />
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={styles.name}>{user?.name ?? "Người dùng"}</Text>
+          <Text style={styles.name}>{user?.name ?? "Quốc Thái"}</Text>
           <View style={styles.rankRow}>
             <Ionicons name="trophy-outline" size={14} color="#DAA520" />
             <Text style={styles.rankText}>Thành viên hạng {user?.rank === "Vang" ? "Vàng" : user?.rank}</Text>
@@ -344,6 +356,17 @@ export default function AccountScreen() {
   return (
     <View style={styles.screen}>
       <Header title={viewTitle[currentView]} />
+      {currentView !== "home" && (
+        <View style={styles.breadcrumbsWrap}>
+          <View style={styles.breadcrumbs}>
+            <Pressable onPress={() => setCurrentView("home")}> 
+              <Text style={styles.breadcrumbLink}>Tài khoản</Text>
+            </Pressable>
+            <Text style={styles.breadcrumbSep}>›</Text>
+            <Text style={styles.breadcrumbCur}>{viewTitle[currentView]}</Text>
+          </View>
+        </View>
+      )}
       {currentView === "home" && renderHome()}
       {currentView === "orders_pending" && (
         <ScrollView contentContainerStyle={{ padding: 16 }}>
@@ -418,6 +441,11 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
   topbarTitle: { fontSize: 16, fontWeight: "700", color: "#111" },
+  breadcrumbsWrap: { paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#F2F2F7", backgroundColor: "#fff" },
+  breadcrumbs: { flexDirection: "row", alignItems: "center", gap: 8 },
+  breadcrumbLink: { color: "#007AFF", fontWeight: "600" },
+  breadcrumbSep: { color: "#8E8E93" },
+  breadcrumbCur: { color: "#111", fontWeight: "700" },
   header: {
     backgroundColor: "#F2FFFD",
     borderRadius: 16,
