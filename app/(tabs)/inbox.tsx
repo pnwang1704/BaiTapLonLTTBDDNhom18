@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   BackHandler,
   FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 type Thread = {
   id: string;
@@ -27,6 +31,7 @@ export default function InboxScreen() {
   const [filter, setFilter] = useState<"all" | "unread">("all");
   const [refreshing, setRefreshing] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  const insets = useSafeAreaInsets();
 
   const [threads, setThreads] = useState<Thread[]>([
     {
@@ -95,7 +100,11 @@ export default function InboxScreen() {
   const markAllRead = () => setThreads(prev => prev.map(t => ({ ...t, unread: 0 })));
 
   const renderThreadItem = ({ item }: { item: Thread }) => (
-    <Pressable style={styles.thread} onPress={() => openThread(item.id)}>
+    <Pressable
+      style={styles.thread}
+      onPress={() => openThread(item.id)}
+      onLongPress={() => setThreads(prev => prev.map(t => (t.id === item.id ? { ...t, unread: t.unread ? 0 : 1 } : t)))}
+    >
       <View style={styles.threadAvatar}>
         <Ionicons
           name={item.type === "order" ? "cube-outline" : item.type === "system" ? "notifications-outline" : "chatbubble-ellipses-outline"}
@@ -118,6 +127,7 @@ export default function InboxScreen() {
 
   // Thread view state
   const [messageText, setMessageText] = useState("");
+  const messagesRef = useRef<FlatList<any>>(null);
 
   const sendMessage = () => {
     const text = messageText.trim();
@@ -146,51 +156,76 @@ export default function InboxScreen() {
   if (currentThread) {
     return (
       <SafeAreaView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => setCurrentThreadId(null)}>
-            <Ionicons name="chevron-back" size={20} color="#111" />
-          </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>{currentThread.title}</Text>
-          <View style={{ width: 36 }} />
-        </View>
-
-        {/* Breadcrumbs */}
-        <View style={styles.breadcrumbsWrap}>
-          <View style={styles.breadcrumbs}>
-            <Pressable onPress={() => setCurrentThreadId(null)}>
-              <Text style={styles.breadcrumbLink}>Inbox</Text>
-            </Pressable>
-            <Text style={styles.breadcrumbSep}>›</Text>
-            <Text style={styles.breadcrumbCur} numberOfLines={1}>{currentThread.title}</Text>
-          </View>
-        </View>
-
-        {/* Messages */}
-        <FlatList
+        <KeyboardAvoidingView
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 12, gap: 8 }}
-          data={currentThread.messages || []}
-          keyExtractor={(m) => m.id}
-          renderItem={({ item }) => (
-            <View style={[styles.bubble, item.from === "me" ? styles.bubbleMe : item.from === "them" ? styles.bubbleThem : styles.bubbleSystem]}>
-              <Text style={item.from === "system" ? styles.bubbleSystemText : styles.bubbleText}>{item.text}</Text>
-            </View>
-          )}
-        />
+          behavior={Platform.select({ ios: "padding", android: "height" })}
+          keyboardVerticalOffset={Platform.OS === "ios" ? insets.top : 0}
+        >
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={{ flex: 1 }}>
+              {/* Header */}
+              <View style={styles.header}>
+                <Pressable style={styles.backBtn} onPress={() => setCurrentThreadId(null)}>
+                  <Ionicons name="chevron-back" size={20} color="#111" />
+                </Pressable>
+                <Text style={styles.headerTitle} numberOfLines={1}>{currentThread.title}</Text>
+                <View style={{ width: 36 }} />
+              </View>
 
-        {/* Composer */}
-        <View style={styles.composer}>
-          <TextInput
-            value={messageText}
-            onChangeText={setMessageText}
-            placeholder="Nhắn gì đó..."
-            style={styles.input}
-          />
-          <Pressable style={styles.sendBtn} onPress={sendMessage}>
-            <Ionicons name="send" size={18} color="#fff" />
-          </Pressable>
-        </View>
+              {/* Breadcrumbs */}
+              <View style={styles.breadcrumbsWrap}>
+                <View style={styles.breadcrumbs}>
+                  <Pressable onPress={() => setCurrentThreadId(null)}>
+                    <Text style={styles.breadcrumbLink}>Inbox</Text>
+                  </Pressable>
+                  <Text style={styles.breadcrumbSep}>›</Text>
+                  <Text style={styles.breadcrumbCur} numberOfLines={1}>{currentThread.title}</Text>
+                </View>
+              </View>
+
+              {/* Messages */}
+              <FlatList
+                ref={messagesRef}
+                style={{ flex: 1 }}
+                contentContainerStyle={{ padding: 12, gap: 8 }}
+                data={currentThread.messages || []}
+                keyExtractor={(m) => m.id}
+                keyboardShouldPersistTaps="handled"
+                onContentSizeChange={() => messagesRef.current?.scrollToEnd({ animated: true })}
+                renderItem={({ item }) => (
+                  <Pressable onLongPress={() => alert("Actions: Sao chép / Xóa (fake)") }>
+                    <View style={[styles.bubble, item.from === "me" ? styles.bubbleMe : item.from === "them" ? styles.bubbleThem : styles.bubbleSystem]}>
+                      <Text style={item.from === "system" ? styles.bubbleSystemText : styles.bubbleText}>{item.text}</Text>
+                    </View>
+                  </Pressable>
+                )}
+              />
+
+              {/* Quick replies */}
+              <View style={styles.quickRow}>
+                {["Chào bạn!", "Mình cần hỗ trợ", "Cảm ơn!"].map((t) => (
+                  <Pressable key={t} style={styles.quickChip} onPress={() => setMessageText((prev) => (prev ? prev + " " + t : t))}>
+                    <Text style={styles.quickText}>{t}</Text>
+                  </Pressable>
+                ))}
+              </View>
+
+              {/* Composer */}
+              <View style={[styles.composer, { paddingBottom: Math.max(12, insets.bottom) }]}>
+                <TextInput
+                  value={messageText}
+                  onChangeText={setMessageText}
+                  placeholder="Nhắn gì đó..."
+                  style={styles.input}
+                  onFocus={() => setTimeout(() => messagesRef.current?.scrollToEnd({ animated: true }), 100)}
+                />
+                <Pressable style={styles.sendBtn} onPress={sendMessage}>
+                  <Ionicons name="send" size={18} color="#fff" />
+                </Pressable>
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
@@ -305,7 +340,7 @@ const styles = StyleSheet.create({
 
   bubble: { maxWidth: "80%", borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8 },
   bubbleMe: { alignSelf: "flex-end", backgroundColor: "#007AFF" },
-  bubbleThem: { alignSelf: "flex-start", backgroundColor: "#F2F2F7" },
+  bubbleThem: { alignSelf: "flex-start", backgroundColor: "gray"},
   bubbleSystem: { alignSelf: "center", backgroundColor: "#FFF4E5" },
   bubbleText: { color: "#fff" },
   bubbleSystemText: { color: "#8E5C00" },
@@ -313,4 +348,7 @@ const styles = StyleSheet.create({
   composer: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: "#EFEFF4", backgroundColor: "#fff" },
   input: { flex: 1, borderWidth: 1, borderColor: "#E5E5EA", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, fontSize: 16, color: "#111" },
   sendBtn: { backgroundColor: "#007AFF", width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center" },
+  quickRow: { flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingTop: 8, paddingBottom: 4, backgroundColor: "#fff", borderTopWidth: 1, borderTopColor: "#F2F2F7" },
+  quickChip: { backgroundColor: "#F2F2F7", borderRadius: 16, paddingHorizontal: 12, paddingVertical: 6 },
+  quickText: { color: "#111", fontWeight: "600" },
 });
