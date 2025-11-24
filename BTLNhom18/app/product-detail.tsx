@@ -1,115 +1,116 @@
+// app/product-detail.tsx
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
-    Dimensions,
-    FlatList,
-    Image,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Dimensions,
+  FlatList,
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCartStore } from '../store/cartStore';
+import { API_URL } from '../constants/api';
 
 const { width } = Dimensions.get('window');
-const THUMB_SIZE = 60;
+const THUMB_SIZE = 80;
 
-// === DỮ LIỆU GIẢ LẬP - ĐÃ FIX ID TRÙNG ===
-const mockRelated = (product: any) => [
-  {
-    id: 'rel1', // ID DUY NHẤT
-    name: product.name + ' Pro',
-    price: product.price.replace('$', '') * 1.2,
-    rating: (product.rating + 0.3).toFixed(1),
-    image: product.image,
-  },
-  {
-    id: 'rel2',
-    name: product.name + ' Lite',
-    price: product.price.replace('$', '') * 0.8,
-    rating: (product.rating - 0.2).toFixed(1),
-    image: product.image,
-  },
-  {
-    id: 'rel3',
-    name: 'Phụ kiện ' + product.name,
-    price: 29,
-    rating: 4.7,
-    image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?w=200',
-  },
-];
-
-const reviews = [
-  { id: 'rev1', name: 'Nguyễn Nam', time: '1 ngày trước', text: 'Chất lượng sản phẩm tốt, âm thanh rõ!', avatar: 'https://i.pravatar.cc/50?img=1' },
-  { id: 'rev2', name: 'Lê Anh', time: '3 ngày trước', text: 'Shop uy tín, giao hàng nhanh!', avatar: 'https://i.pravatar.cc/50?img=2' },
-  { id: 'rev3', name: 'Trần Vy', time: '1 tuần trước', text: 'Pin trâu, đáng tiền!', avatar: 'https://i.pravatar.cc/50?img=3' },
-];
-
-// === COMPONENT PHỤ ===
-const ReviewItem = React.memo(({ item }: { item: any }) => (
-  <Animated.View entering={FadeInDown.delay(100)} style={styles.reviewItem}>
-    <Image source={{ uri: item.avatar }} style={styles.reviewAvatar} />
-    <View style={styles.reviewContent}>
-      <View style={styles.reviewHeader}>
-        <Text style={styles.reviewName}>{item.name}</Text>
-        <Text style={styles.reviewTime}>{item.time}</Text>
-      </View>
-      <Text style={styles.reviewText}>{item.text}</Text>
-    </View>
-  </Animated.View>
-));
-
-const RelatedProduct = React.memo(({ item }: { item: any }) => (
-  <TouchableOpacity style={styles.relatedCard} activeOpacity={0.9}>
-    <Image source={{ uri: item.image }} style={styles.relatedImage} />
-    <Text style={styles.relatedName} numberOfLines={1}>{item.name}</Text>
-    <View style={styles.rating}>
-      <Ionicons name="star" size={14} color="#F1C40F" />
-      <Text style={styles.ratingText}>{item.rating}</Text>
-    </View>
-    <Text style={styles.price}>${item.price}</Text>
-  </TouchableOpacity>
-));
-
-// === MAIN SCREEN ===
 export default function ProductDetailScreen() {
-  const { id, name, price, rating, image } = useLocalSearchParams();
+  const { id } = useLocalSearchParams();
   const router = useRouter();
   const { addItem, getTotalItems } = useCartStore();
 
-  const product = useMemo(() => ({
-    id: id as string,
-    name: (name as string) || 'Headphone',
-    price: (price as string) || '$59',
-    rating: rating ? parseFloat(rating as string) : 4.5,
-    image: (image as string) || 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=800',
-  }), [id, name, price, rating, image]);
+  const [product, setProduct] = useState<any | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // ĐÃ FIX: ID DUY NHẤT, KHÔNG DÍNH ID GỐC
-  const relatedProducts = useMemo(() => mockRelated(product), [product]);
+  // Lấy dữ liệu sản phẩm + sản phẩm liên quan
+ useEffect(() => {
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
 
-  const handleAddToCart = () => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.price,
-      image: product.image,
-      quantity: 1,
-    });
+      // BƯỚC 1: Lấy chi tiết sản phẩm trước
+      const productRes = await fetch(`${API_URL}/api/products/${id}`);
+      const productData = await productRes.json();
+      const product = productData.product || productData;
+      setProduct(product);
+
+      // BƯỚC 2: Lấy related theo category THẬT của sản phẩm
+      const category = product.category || 'electronics'; // fallback an toàn
+      const relatedRes = await fetch(`${API_URL}/api/products/related/${category}?exclude=${id}`);
+      const relatedData = await relatedRes.json();
+      setRelatedProducts(relatedData.products || relatedData || []);
+
+    } catch (err) {
+      setError('Không tải được sản phẩm. Vui lòng thử lại!');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (id) fetchProduct();
+}, [id]);
+
+const handleAddToCart = () => {
+  if (!product) return;
+
+  const safePrice = Number(product.price) || parseInt(String(product.price).replace(/\D/g, ''), 10) || 0;
+
+  addItem({
+    id: product._id,
+    name: product.name,
+    price: safePrice,
+    displayPrice: `${formatPrice(safePrice)} VND`,
+    image: product.image,
+    
+  });
+};
+
+  const formatPrice = (price: number | string) => {
+  const num = typeof price === "string" ? parseInt(price) : price;
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
 
   const handleBuyNow = () => {
     handleAddToCart();
     router.push('/cart');
   };
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={styles.loadingText}>Đang tải sản phẩm...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error || !product) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.error}>
+          <Text style={styles.errorText}>{error || 'Sản phẩm không tồn tại'}</Text>
+          <TouchableOpacity style={styles.retryBtn} onPress={() => router.back()}>
+            <Text style={styles.retryText}>Quay lại</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={28} color="#000" />
@@ -124,115 +125,91 @@ export default function ProductDetailScreen() {
               </View>
             )}
           </TouchableOpacity>
-          <Image source={{ uri: 'https://images.unsplash.com/photo-1633332755192-727a05c4013d?w=50' }} style={styles.avatar} />
         </View>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Product Image + Thumbs */}
         <Animated.View entering={FadeIn.duration(500)}>
           <View style={styles.imageContainer}>
             <Image source={{ uri: product.image }} style={styles.mainImage} />
             <View style={styles.thumbRow}>
-              {[0, 1, 2].map((i) => (
-                <View key={`thumb-${i}`} style={[styles.thumb, i === 0 && styles.activeThumb]}>
-                  <Image source={{ uri: product.image }} style={styles.thumbImage} />
+              {[product.image, product.image, product.image].map((img, i) => (
+                <View key={i} style={[styles.thumb, i === 0 && styles.activeThumb]}>
+                  <Image source={{ uri: img }} style={styles.thumbImage} />
                 </View>
               ))}
             </View>
           </View>
         </Animated.View>
 
-        {/* Price + Rating */}
         <Animated.View entering={FadeInDown.delay(200)}>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{product.price}</Text>
+            <Text style={styles.price}>{formatPrice(product.price)} VND</Text>
             <View style={styles.ratingRow}>
               <Ionicons name="star" size={18} color="#F1C40F" />
-              <Text style={styles.ratingValue}>{product.rating}</Text>
-              <Text style={styles.reviewCount}>(99 đánh giá)</Text>
+              <Text style={styles.ratingValue}>{product.rating || 4.8}</Text>
+              <Text style={styles.reviewCount}>({product.reviews?.length || 99} đánh giá)</Text>
             </View>
           </View>
         </Animated.View>
 
-        {/* Description */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Mô tả sản phẩm</Text>
           <Text style={styles.description}>
-            Sản phẩm chất lượng cao với công nghệ hiện đại. Thiết kế tinh tế, phù hợp cho mọi lứa tuổi. 
-            Bảo hành chính hãng 12 tháng. Giao hàng toàn quốc.
+            {product.description || 'Sản phẩm chất lượng cao, chính hãng 100%. Bảo hành 12 tháng. Giao hàng nhanh toàn quốc.'}
           </Text>
         </View>
 
-        {/* Features */}
         <View style={styles.featuresRow}>
           <View style={styles.feature}>
-            <MaterialIcons name="local-shipping" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Giao hàng nhanh</Text>
+            <MaterialIcons name="local-shipping" size={24} color="#007AFF" />
+            <Text style={styles.featureText}>Giao nhanh 2h</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="refresh" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Đổi trả 30 ngày</Text>
+            <Ionicons name="shield-checkmark" size={24} color="#007AFF" />
+            <Text style={styles.featureText}>Chính hãng</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="star" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Đánh giá tốt</Text>
-          </View>
-          <View style={styles.feature}>
-            <Ionicons name="shield-checkmark" size={20} color="#007AFF" />
-            <Text style={styles.featureText}>Shop uy tín</Text>
+            <Ionicons name="refresh" size={24} color="#007AFF" />
+            <Text style={styles.featureText}>Đổi trả dễ dàng</Text>
           </View>
         </View>
 
-        {/* Reviews */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Đánh giá</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Xem tất cả</Text>
-            </TouchableOpacity>
+        {/* Sản phẩm liên quan */}
+        {relatedProducts.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Sản phẩm liên quan</Text>
+            </View>
+            <FlatList
+              data={relatedProducts}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(item) => item._id}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={styles.relatedCard}
+                  onPress={() => router.push(`/product-detail?id=${item._id}`)}
+                >
+                  <Image source={{ uri: item.image }} style={styles.relatedImage} />
+                  <Text style={styles.relatedName} numberOfLines={2}>{item.name}</Text>
+                  <Text style={styles.price}>{formatPrice(item.price)} VND</Text>
+                </TouchableOpacity>
+              )}
+              contentContainerStyle={{ paddingVertical: 8 }}
+            />
           </View>
-
-          <View style={styles.ratingBar}>
-            <Text style={styles.ratingBig}>{product.rating}/5</Text>
-            <Text style={styles.reviewCount}>(99 đánh giá)</Text>
-          </View>
-
-          {reviews.map((item) => (
-            <ReviewItem key={item.id} item={item} />
-          ))}
-        </View>
-
-        {/* Related Products - ĐÃ FIX KEY TRÙNG */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Sản phẩm liên quan</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAll}>Xem tất cả</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={relatedProducts}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item) => item.id} // rel1, rel2, rel3 → DUY NHẤT
-            renderItem={({ item }) => <RelatedProduct item={item} />}
-            contentContainerStyle={styles.relatedList}
-          />
-        </View>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Actions */}
       <Animated.View entering={FadeIn.delay(400)} style={styles.bottomActions}>
         <TouchableOpacity style={styles.addToCartButton} onPress={handleAddToCart}>
-          <Ionicons name="cart-outline" size={20} color="#007AFF" style={{ marginRight: 8 }} />
+          <Ionicons name="cart-outline" size={22} color="#007AFF" />
           <Text style={styles.addToCartText}>Thêm vào giỏ</Text>
         </TouchableOpacity>
-
         <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow}>
-          <Ionicons name="cart" size={20} color="#fff" style={{ marginRight: 8 }} />
           <Text style={styles.buyText}>Mua ngay</Text>
         </TouchableOpacity>
       </Animated.View>
@@ -331,4 +308,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14, borderRadius: 12,
   },
   buyText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+  loading: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingText: { marginTop: 16, fontSize: 16, color: '#666' },
+  error: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  errorText: { fontSize: 18, color: '#FF3B30', textAlign: 'center', marginBottom: 20 },
+  retryBtn: { backgroundColor: '#007AFF', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
+  retryText: { color: '#fff', fontWeight: '600' },
 });
