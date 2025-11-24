@@ -14,8 +14,16 @@ import Animated, { FadeIn, Layout } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCartStore } from '../store/cartStore';
 
+// HÀM FORMAT GIÁ ĐẸP – DÙNG CHUNG TOÀN APP
+const formatPrice = (price: number | string): string => {
+  const num = typeof price === "string" 
+    ? parseInt(price.replace(/\D/g, ""), 10) || 0 
+    : price;
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+};
+
 const CartItem = React.memo(({ item, onUpdate, onRemove }: any) => {
-  const [quantity, setQuantity] = React.useState(item.quantity);
+  const [quantity, setQuantity] = React.useState(item.quantity || 1);
 
   const handleDecrease = () => {
     if (quantity > 1) {
@@ -35,11 +43,11 @@ const CartItem = React.memo(({ item, onUpdate, onRemove }: any) => {
     <Animated.View entering={FadeIn} layout={Layout} style={styles.item}>
       <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{item.name}</Text>
+        <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+
+        {/* GIÁ ĐẸP NHƯ SHOPEE – DÙ LÀ NUMBER HAY CHUỖI CŨ ĐỀU HIỂN THỊ ĐÚNG */}
         <Text style={styles.price}>
-          {typeof item.price === 'number'
-            ? `${item.price.toLocaleString('vi-VN')} ₫`
-            : item.price}
+          {item.displayPrice || `${formatPrice(item.price)} VND`}
         </Text>
 
         <View style={styles.controls}>
@@ -51,7 +59,6 @@ const CartItem = React.memo(({ item, onUpdate, onRemove }: any) => {
             <Ionicons name="remove" size={16} color="#fff" />
           </TouchableOpacity>
 
-          {/* ĐÃ FIX LỖI REANIMATED */}
           <Animated.Text
             entering={FadeIn.springify().mass(0.3)}
             layout={Layout}
@@ -64,10 +71,7 @@ const CartItem = React.memo(({ item, onUpdate, onRemove }: any) => {
             <Ionicons name="add" size={16} color="#fff" />
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => onRemove(item.id)}
-            style={styles.removeBtn}
-          >
+          <TouchableOpacity onPress={() => onRemove(item.id)} style={styles.removeBtn}>
             <Ionicons name="trash-outline" size={18} color="#fff" />
           </TouchableOpacity>
         </View>
@@ -89,11 +93,7 @@ export default function CartScreen() {
       'Bạn có chắc muốn xóa sản phẩm này khỏi giỏ hàng?',
       [
         { text: 'Hủy', style: 'cancel' },
-        {
-          text: 'Xóa',
-          style: 'destructive',
-          onPress: () => removeItem(id),
-        },
+        { text: 'Xóa', style: 'destructive', onPress: () => removeItem(id) },
       ]
     );
   };
@@ -101,7 +101,7 @@ export default function CartScreen() {
   const handleCheckout = () => {
     Alert.alert(
       'Xác nhận thanh toán',
-      `Tổng đơn hàng: ${total.toLocaleString('vi-VN')} ₫`,
+      `Tổng đơn hàng: ${formatPrice(total)} VND`,
       [
         { text: 'Hủy' },
         {
@@ -143,27 +143,23 @@ export default function CartScreen() {
         <View style={{ width: 26 }} />
       </View>
 
-      {/* Danh sách */}
+      {/* Danh sách sản phẩm */}
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <CartItem
-            item={item}
-            onUpdate={updateQuantity}
-            onRemove={handleRemove}
-          />
+          <CartItem item={item} onUpdate={updateQuantity} onRemove={handleRemove} />
         )}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
       />
 
-      {/* Tổng tiền + Thanh toán */}
+      {/* Footer – Tổng tiền + Thanh toán */}
       <Animated.View entering={FadeIn.delay(300)} style={styles.footer}>
         <View style={styles.summary}>
           <Text style={styles.totalLabel}>Tổng cộng:</Text>
           <Text style={styles.totalAmount}>
-            {total.toLocaleString('vi-VN')} ₫
+            {formatPrice(total)} VND
           </Text>
         </View>
 
@@ -181,7 +177,7 @@ export default function CartScreen() {
   );
 }
 
-// === STYLES – SIÊU HIỆN ĐẠI ===
+// STYLES – ĐẸP LUNG LINH NHƯ APP TRIỆU USER
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
@@ -202,37 +198,32 @@ const styles = StyleSheet.create({
     marginVertical: 6,
     padding: 12,
     borderRadius: 16,
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3,
+    shadowRadius: 4,
   },
-  image: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    backgroundColor: '#f0f0f0',
-  },
+  image: { width: 80, height: 80, borderRadius: 12, backgroundColor: '#f0f0f0' },
   info: { flex: 1, marginLeft: 12, justifyContent: 'space-between' },
   name: { fontSize: 16, fontWeight: '600', color: '#000' },
-  price: { fontSize: 15, color: '#666', marginVertical: 2 },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  price: { fontSize: 16, fontWeight: 'bold', color: '#E11D48', marginVertical: 4 },
+  controls: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 8 },
   qtyBtn: {
     backgroundColor: '#007AFF',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
   disabledBtn: { backgroundColor: '#ccc' },
-  quantity: { fontSize: 16, fontWeight: '600', minWidth: 24, textAlign: 'center' },
+  quantity: { fontSize: 17, fontWeight: '600', minWidth: 30, textAlign: 'center', color: '#000' },
   removeBtn: {
     backgroundColor: '#FF3B30',
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -246,15 +237,11 @@ const styles = StyleSheet.create({
     padding: 16,
     borderTopWidth: 1,
     borderTopColor: '#eee',
-    elevation: 10,
+    elevation: 15,
   },
-  summary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  totalLabel: { fontSize: 18, fontWeight: '600', color: '#000' },
-  totalAmount: { fontSize: 20, fontWeight: 'bold', color: '#34C759' },
+  summary: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 14 },
+  totalLabel: { fontSize: 19, fontWeight: '600', color: '#000' },
+  totalAmount: { fontSize: 24, fontWeight: 'bold', color: '#E11D48' },
 
   checkoutBtn: {
     backgroundColor: '#007AFF',
@@ -263,11 +250,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     borderRadius: 14,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  checkoutText: { color: '#fff', fontSize: 17, fontWeight: '600', marginLeft: 8 },
+  checkoutText: { color: '#fff', fontSize: 18, fontWeight: '600', marginLeft: 8 },
   clearBtn: {
-    backgroundColor: '#000',
+    backgroundColor: '#1a1a1a',
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -276,19 +263,9 @@ const styles = StyleSheet.create({
   },
   clearText: { color: '#fff', fontSize: 15, fontWeight: '600', marginLeft: 6 },
 
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  emptyTitle: { fontSize: 22, fontWeight: '600', color: '#999', marginTop: 16 },
-  emptySubtitle: { fontSize: 16, color: '#aaa', marginTop: 8, marginBottom: 24 },
-  shopBtn: {
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 14,
-  },
-  shopBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
+  emptyTitle: { fontSize: 24, fontWeight: '600', color: '#999', marginTop: 16 },
+  emptySubtitle: { fontSize: 16, color: '#aaa', marginTop: 8, marginBottom: 30 },
+  shopBtn: { backgroundColor: '#007AFF', paddingHorizontal: 36, paddingVertical: 16, borderRadius: 14 },
+  shopBtnText: { color: '#fff', fontSize: 17, fontWeight: '600' },
 });
