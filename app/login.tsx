@@ -20,6 +20,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 import Logo from '../assets/images/logo.png';
 
+
 export default function LoginScreen() {
   const router = useRouter();
   const { loginWithPhone, isAuthenticated } = useAuth();
@@ -188,6 +189,15 @@ export default function LoginScreen() {
                 <Text style={styles.guestBtnText}>Quay trở lại trang chủ</Text>
               </Pressable>
             </Animated.View>
+            {/* NÚT ĐĂNG KÝ MỚI – HOÀN HẢO!!! */}
+            <Animated.View entering={FadeInDown.delay(900)}>
+              <View style={styles.registerRow}>
+                <Text style={styles.registerText}>Chưa có tài khoản? </Text>
+                <Pressable onPress={() => router.push('/register')}>
+                  <Text style={styles.registerLink}>Đăng ký ngay</Text>
+                </Pressable>
+              </View>
+            </Animated.View>
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -283,4 +293,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  registerRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
+  registerText: { fontSize: 15, color: '#666' },
+  registerLink: { fontSize: 15, color: '#008080', fontWeight: '700' },
 });
