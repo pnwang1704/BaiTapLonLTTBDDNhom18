@@ -1,516 +1,261 @@
+// app/(tabs)/inbox.tsx – PHIÊN BẢN CUỐI CÙNG, ĐẸP NHƯ APP TRIỆU USER!!!
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  BackHandler,
-  FlatList,
-  Keyboard,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
+  View,
   Text,
   TextInput,
-  View,
+  TouchableOpacity,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
 } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-type Message = {
+interface Message {
   id: string;
-  from: 'me' | 'them' | 'system';
   text: string;
-  at: number;
-};
-
-type Thread = {
-  id: string;
-  title: string;
-  lastMessage: string;
-  unread: number;
-  type: 'system' | 'order' | 'chat';
-  updatedAt: number;
-  messages: Message[];
-};
-
-// === HELPER: TIME AGO ===
-const formatTime = (timestamp: number) => {
-  const now = Date.now();
-  const diff = now - timestamp;
-  const minutes = Math.floor(diff / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (minutes < 1) return 'Vừa xong';
-  if (minutes < 60) return `${minutes} phút trước`;
-  if (hours < 24) return `${hours} giờ trước`;
-  return `${days} ngày trước`;
-};
-
-// === COMPONENT: THREAD ITEM ===
-const ThreadItem = React.memo(({ item, onPress }: { item: Thread; onPress: () => void }) => (
-  <Animated.View entering={FadeInDown}>
-    <Pressable style={styles.thread} onPress={onPress}>
-      <View style={[styles.threadAvatar, styles[`avatar_${item.type}`]]}>
-        <Ionicons
-          name={
-            item.type === 'order'
-              ? 'cube-outline'
-              : item.type === 'system'
-              ? 'notifications-outline'
-              : 'chatbubble-ellipses-outline'
-          }
-          size={18}
-          color="#fff"
-        />
-      </View>
-      <View style={{ flex: 1 }}>
-        <View style={styles.rowBetween}>
-          <Text style={styles.threadTitle} numberOfLines={1}>
-            {item.title}
-          </Text>
-          {item.unread > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadText}>{item.unread > 99 ? '99+' : item.unread}</Text>
-            </View>
-          )}
-        </View>
-        <Text style={styles.threadLast} numberOfLines={1}>
-          {item.lastMessage}
-        </Text>
-        <Text style={styles.threadTime}>{formatTime(item.updatedAt)}</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
-    </Pressable>
-  </Animated.View>
-));
-
-// === COMPONENT: MESSAGE BUBBLE ===
-const MessageBubble = React.memo(({ item }: { item: Message }) => (
-  <Animated.View
-    entering={FadeIn}
-    style={[
-      styles.bubble,
-      item.from === 'me' ? styles.bubbleMe : item.from === 'them' ? styles.bubbleThem : styles.bubbleSystem,
-    ]}
-  >
-    <Text
-      style={
-        item.from === 'system' ? styles.bubbleSystemText : item.from === 'me' ? styles.bubbleMeText : styles.bubbleText
-      }
-    >
-      {item.text}
-    </Text>
-    <Text style={styles.messageTime}>{formatTime(item.at)}</Text>
-  </Animated.View>
-));
+  isUser: boolean;
+  timestamp: Date;
+}
 
 export default function InboxScreen() {
   const router = useRouter();
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState<'all' | 'unread'>('all');
-  const [refreshing, setRefreshing] = useState(false);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
-  const [messageText, setMessageText] = useState('');
-  const messagesEndRef = useRef<FlatList>(null);
-
-  const [threads, setThreads] = useState<Thread[]>([
+  const scrollViewRef = useRef<ScrollView>(null);
+  const [messages, setMessages] = useState<Message[]>([
     {
-      id: 't1',
-      title: 'CSKH #1',
-      lastMessage: 'Xin chào! Tôi có thể giúp gì?',
-      unread: 2,
-      type: 'chat',
-      updatedAt: Date.now() - 1_000 * 60,
-      messages: [
-        { id: 'm1', from: 'them', text: 'Xin chào!', at: Date.now() - 1_000 * 80 },
-        { id: 'm2', from: 'them', text: 'Tôi có thể giúp gì?', at: Date.now() - 1_000 * 60 },
-      ],
-    },
-    {
-      id: 't2',
-      title: 'Đơn #A1234',
-      lastMessage: 'Đơn hàng đã được xác nhận.',
-      unread: 0,
-      type: 'order',
-      updatedAt: Date.now() - 1_000 * 3600,
-      messages: [
-        { id: 'm1', from: 'system', text: 'Đơn hàng đã được xác nhận.', at: Date.now() - 1_000 * 3600 },
-      ],
-    },
-    {
-      id: 't3',
-      title: 'Shop A',
-      lastMessage: 'Đã gửi hàng, dự kiến 2-3 ngày.',
-      unread: 1,
-      type: 'chat',
-      updatedAt: Date.now() - 1_000 * 600,
-      messages: [
-        { id: 'm1', from: 'them', text: 'Đã gửi hàng, dự kiến 2-3 ngày.', at: Date.now() - 1_000 * 600 },
-      ],
+      id: 'welcome',
+      text: 'Xin chào bạn! Mình là Shoppy AI đây ạ ✨\nMình có thể giúp bạn:\n• Tìm sản phẩm đẹp giá tốt\n• Tư vấn size chuẩn\n• Kiểm tra đơn hàng\n• Giải đáp mọi thắc mắc\n\nBạn cần mình hỗ trợ gì nào?',
+      isUser: false,
+      timestamp: new Date(),
     },
   ]);
+  const [inputText, setInputText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
 
-  const currentThread = useMemo(
-    () => threads.find((t) => t.id === currentThreadId) || null,
-    [threads, currentThreadId]
-  );
+  // Từ khóa + phản hồi siêu thông minh
+  const aiResponses: { [key: string]: string } = {
+    'giao|ship|phí ship': 'Giao hàng nhanh toàn quốc ạ!\n• Nội thành: 1-2 ngày (20k)\n• Ngoại tỉnh: 2-4 ngày (30k)\n• Miễn phí ship đơn từ 300k',
+    'đổi trả|bảo hành': 'Đổi trả MIỄN PHÍ trong 7 ngày nếu lỗi hoặc không vừa size ạ! Chỉ cần giữ nguyên tem mác và hóa đơn là được nhé',
+    'mã giảm|mã khuyến|giảm giá': 'Dùng ngay mã: NEW50 giảm 50k cho đơn từ 300k\nWELCOME30 giảm 30k cho khách mới\nHôm nay còn mã FREESHIP nữa nha!',
+    'áo thun|áo phông': 'Áo thun hot nhất đang có:\n• Basic trắng/đen: 99k-129k\n• Form rộng unisex: 169k\n• Local brand: 229k-299k\nMình gửi bạn xem ngay nhé!',
+    'váy|đầm': 'Váy đẹp đang "hot hòn họt":\n• Váy hoa nhí: 249k\n• Váy maxi đi biển: 299k\n• Váy công sở thanh lịch: 379k\nBạn thích kiểu nào mình gợi ý thêm?',
+    'giày|sneaker': 'Giày sneaker đang sale mạnh:\n• Giày trắng basic: 399k → 299k\n• Giày thể thao: 499k\n• Sandal cao gót: 279k',
+    'size|kích thước|mặc size': 'Bạn cho mình biết chiều cao & cân nặng được không ạ?\nVí dụ: 1m62, 50kg → mặc size M vừa đẹp luôn!\nSize chart:\n• S: 45-52kg | M: 52-58kg | L: 58-65kg',
+    'hi|hello|chào|alo|hey': 'Dạ chào bạn ơi! Shoppy AI sẵn sàng hỗ trợ 24/7 đây ạ',
+    'cảm ơn|thanks|cám ơn': 'Dạ không có gì ạ! Chúc bạn shopping thật vui và săn được nhiều deal xịn nhé!\nCó gì cứ gọi mình nha',
+  };
 
-  const filteredThreads = useMemo(() => {
-    let data = threads;
-    if (filter === 'unread') data = data.filter((t) => t.unread > 0);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      data = data.filter(
-        (t) =>
-          t.title.toLowerCase().includes(q) ||
-          t.lastMessage.toLowerCase().includes(q)
-      );
+  const getAIResponse = (text: string): string => {
+    const lower = text.toLowerCase().trim();
+    for (const [keys, response] of Object.entries(aiResponses)) {
+      if (keys.split('|').some(k => lower.includes(k.trim()))) {
+        return response;
+      }
     }
-    return data.sort((a, b) => b.updatedAt - a.updatedAt);
-  }, [threads, filter, search]);
+    const fallbacks = [
+      'Mình đang học thêm để hỗ trợ bạn tốt hơn nha!\nBạn thử hỏi: "giao hàng", "mã giảm giá", "tư vấn size", "áo thun đẹp" nhé!',
+      'Câu này hơi khó xíu\nMình gợi ý bạn hỏi cụ thể hơn được không ạ? Ví dụ: "cho tôi váy dưới 300k" hoặc "size L còn không?"',
+      'Shoppy AI đang suy nghĩ rất chăm chỉ đây...\nTrong lúc chờ, bạn muốn xem sản phẩm đang hot nhất không ạ?',
+    ];
+    return fallbacks[Math.floor(Math.random() * fallbacks.length)];
+  };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      setThreads((prev) =>
-        prev.map((t) =>
-          t.id === 't2' ? { ...t, unread: t.unread + 1 } : t
-        )
-      );
-      setRefreshing(false);
-    }, 800);
-  }, []);
+  const sendMessage = () => {
+    if (!inputText.trim()) return;
 
-  const openThread = useCallback((id: string) => {
-    setCurrentThreadId(id);
-    setThreads((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, unread: 0 } : t))
-    );
-  }, []);
-
-  const markAllRead = useCallback(() => {
-    setThreads((prev) => prev.map((t) => ({ ...t, unread: 0 })));
-  }, []);
-
-  const sendMessage = useCallback(() => {
-    const text = messageText.trim();
-    if (!text || !currentThread) return;
-
-    const now = Date.now();
-    const newMsg: Message = {
-      id: `m-${now}`,
-      from: 'me',
-      text,
-      at: now,
+    const userMsg: Message = {
+      id: Date.now().toString(),
+      text: inputText,
+      isUser: true,
+      timestamp: new Date(),
     };
 
-    setThreads((prev) =>
-      prev.map((t) => {
-        if (t.id !== currentThread.id) return t;
-        const messages = [...(t.messages || []), newMsg];
-        return {
-          ...t,
-          messages,
-          lastMessage: text,
-          updatedAt: now,
-        };
-      })
-    );
-    setMessageText('');
-    Keyboard.dismiss();
-    setTimeout(() => messagesEndRef.current?.scrollToEnd({ animated: true }), 100);
-  }, [messageText, currentThread]);
+    setMessages(prev => [...prev, userMsg]);
+    setInputText('');
+    setIsTyping(true);
 
-  // BackHandler
+    setTimeout(() => {
+      const aiReply: Message = {
+        id: (Date.now() + 1).toString(),
+        text: getAIResponse(inputText),
+        isUser: false,
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, aiReply]);
+      setIsTyping(false);
+    }, 800 + Math.random() * 700);
+  };
+
   useEffect(() => {
-    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      if (currentThreadId) {
-        setCurrentThreadId(null);
-        return true;
-      }
-      return false;
-    });
-    return () => sub.remove();
-  }, [currentThreadId]);
+    const timer = setTimeout(() => {
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [messages]);
 
-  // Auto scroll khi mở thread
-  useEffect(() => {
-    if (currentThreadId) {
-      setTimeout(() => messagesEndRef.current?.scrollToEnd({ animated: false }), 300);
-    }
-  }, [currentThreadId]);
-
-  // === RENDER THREAD VIEW ===
-  if (currentThread) {
-    return (
-      <SafeAreaView style={styles.container}>
+  return (
+    <SafeAreaView style={styles.container} edges={['bottom']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
         {/* Header */}
-        <Animated.View entering={FadeIn} style={styles.header}>
-          <Pressable style={styles.backBtn} onPress={() => setCurrentThreadId(null)}>
-            <Ionicons name="chevron-back" size={24} color="#007AFF" />
-          </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {currentThread.title}
-          </Text>
-          <View style={{ width: 36 }} />
-        </Animated.View>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={{ padding: 4 }}>
+            <Ionicons name="arrow-back" size={26} color="#000" />
+          </TouchableOpacity>
+          <View style={styles.aiInfo}>
+            <View style={styles.avatar}>
+              <Text style={styles.avatarText}>AI</Text>
+            </View>
+            <View>
+              <Text style={styles.aiName}>Shoppy AI</Text>
+              <Text style={styles.aiStatus}>Đang online • Trả lời ngay</Text>
+            </View>
+          </View>
+          <View style={{ width: 40 }} />
+        </View>
 
-        {/* Messages */}
-        <FlatList
-          ref={messagesEndRef}
-          data={currentThread.messages}
-          keyExtractor={(m) => m.id}
-          renderItem={({ item }) => <MessageBubble item={item} />}
-          contentContainerStyle={styles.messagesContent}
+        {/* Chat */}
+        <ScrollView
+          ref={scrollViewRef}
+          contentContainerStyle={styles.chatContainer}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={10}
-          maxToRenderPerBatch={10}
-        />
+        >
+          {messages.map(msg => (
+            <View
+              key={msg.id}
+              style={[
+                styles.messageBubble,
+                msg.isUser ? styles.userBubble : styles.aiBubble,
+              ]}
+            >
+              {!msg.isUser && <Text style={styles.aiLabel}>Shoppy AI</Text>}
+              <Text style={msg.isUser ? styles.userText : styles.aiText}>
+                {msg.text}
+              </Text>
+              <Text style={styles.timestamp}>
+                {msg.timestamp.toLocaleTimeString('vi-VN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </Text>
+            </View>
+          ))}
 
-        {/* Composer */}
-        <Animated.View entering={FadeIn.delay(200)} style={styles.composer}>
+          {isTyping && (
+            <View style={[styles.messageBubble, styles.aiBubble]}>
+              <Text style={styles.typing}>Shoppy AI đang gõ</Text>
+            </View>
+          )}
+        </ScrollView>
+
+        {/* Input */}
+        <View style={styles.inputContainer}>
           <TextInput
-            value={messageText}
-            onChangeText={setMessageText}
-            placeholder="Nhập tin nhắn..."
-            style={styles.input}
+            style={styles.textInput}
+            placeholder="Nhắn tin cho Shoppy AI..."
+            value={inputText}
+            onChangeText={setInputText}
             onSubmitEditing={sendMessage}
             returnKeyType="send"
             blurOnSubmit={false}
           />
-          <Pressable
-            style={[styles.sendBtn, !messageText.trim() && styles.sendBtnDisabled]}
+          <TouchableOpacity
             onPress={sendMessage}
-            disabled={!messageText.trim()}
+            style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled]}
+            disabled={!inputText.trim()}
           >
-            <Ionicons name="send" size={20} color="#fff" />
-          </Pressable>
-        </Animated.View>
-      </SafeAreaView>
-    );
-  }
-
-  // === LIST VIEW ===
-  return (
-    <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <Animated.View entering={FadeIn} style={styles.header}>
-        <Text style={styles.headerTitle}>Inbox</Text>
-        {filteredThreads.some((t) => t.unread > 0) && (
-          <Pressable style={styles.markReadBtn} onPress={markAllRead}>
-            <Ionicons name="checkmark-done-outline" size={18} color="#007AFF" />
-            <Text style={styles.markReadText}>Đánh dấu đã đọc</Text>
-          </Pressable>
-        )}
-      </Animated.View>
-
-      {/* Search */}
-      <Animated.View entering={FadeInDown.delay(100)} style={styles.searchRow}>
-        <Ionicons name="search" size={18} color="#8E8E93" />
-        <TextInput
-          value={search}
-          onChangeText={setSearch}
-          placeholder="Tìm kiếm tin nhắn..."
-          style={styles.searchInput}
-          clearButtonMode="while-editing"
-        />
-      </Animated.View>
-
-      {/* Filter */}
-      <Animated.View entering={FadeInDown.delay(200)} style={styles.segmentRow}>
-        <Pressable
-          onPress={() => setFilter('all')}
-          style={[styles.segmentBtn, filter === 'all' && styles.segmentActive]}
-        >
-          <Text style={[styles.segmentText, filter === 'all' && styles.segmentTextActive]}>
-            Tất cả
-          </Text>
-        </Pressable>
-        <Pressable
-          onPress={() => setFilter('unread')}
-          style={[styles.segmentBtn, filter === 'unread' && styles.segmentActive]}
-        >
-          <Text style={[styles.segmentText, filter === 'unread' && styles.segmentTextActive]}>
-            Chưa đọc
-          </Text>
-        </Pressable>
-      </Animated.View>
-
-      {/* Threads */}
-      <FlatList
-        data={filteredThreads}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ThreadItem item={item} onPress={() => openThread(item.id)} />}
-        ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-        contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-        ListEmptyComponent={() => (
-          <Animated.View entering={FadeIn} style={styles.emptyState}>
-            <Ionicons name="chatbubble-outline" size={48} color="#C7C7CC" />
-            <Text style={styles.emptyTitle}>Không có tin nhắn</Text>
-            <Text style={styles.emptySubtitle}>Tin nhắn sẽ xuất hiện tại đây</Text>
-          </Animated.View>
-        )}
-        initialNumToRender={10}
-      />
+            <Ionicons name="send" size={24} color={inputText.trim() ? "#007AFF" : "#aaa"} />
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-// === STYLES ===
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9F9FB' },
-
-  // Header
+  container: { flex: 1, backgroundColor: '#f8f9fa' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    paddingVertical: 14,
     backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#EFEFF4',
+    borderBottomColor: '#eee',
   },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111' },
-  backBtn: { padding: 4 },
-  markReadBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  markReadText: { color: '#007AFF', fontWeight: '600', fontSize: 14 },
-
-  // Search
-  searchRow: {
-    marginHorizontal: 16,
-    marginTop: 12,
-    marginBottom: 8,
-    backgroundColor: '#fff',
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  searchInput: { flex: 1, fontSize: 16, color: '#111' },
-
-  // Filter
-  segmentRow: { flexDirection: 'row', gap: 10, paddingHorizontal: 16, marginBottom: 12 },
-  segmentBtn: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-  },
-  segmentActive: { backgroundColor: '#007AFF', borderColor: '#007AFF' },
-  segmentText: { fontWeight: '600', color: '#111' },
-  segmentTextActive: { color: '#fff' },
-
-  // List
-  listContent: { paddingHorizontal: 16, paddingBottom: 20 },
-  emptyState: { alignItems: 'center', paddingTop: 60 },
-  emptyTitle: { fontSize: 16, fontWeight: '600', color: '#8E8E93', marginTop: 12 },
-  emptySubtitle: { fontSize: 14, color: '#AAA', marginTop: 4 },
-
-  // Thread Item
-  thread: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    backgroundColor: '#fff',
-    padding: 14,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#EFEFF4',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-  },
-  threadAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatar_chat: { backgroundColor: '#007AFF' },
-  avatar_order: { backgroundColor: '#34C759' },
-  avatar_system: { backgroundColor: '#FF9500' },
-  threadTitle: { fontWeight: '700', color: '#111', fontSize: 15 },
-  threadLast: { color: '#6B7280', fontSize: 14, marginTop: 4 },
-  threadTime: { color: '#AAA', fontSize: 12, marginTop: 4 },
-  unreadBadge: {
-    backgroundColor: '#FF3B30',
-    minWidth: 20,
-    height: 20,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  unreadText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-
-  // Messages
-  messagesContent: { padding: 16, gap: 12, paddingBottom: 20 },
-  bubble: {
-    maxWidth: '75%',
-    borderRadius: 18,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    position: 'relative',
-  },
-  bubbleMe: { alignSelf: 'flex-end', backgroundColor: '#007AFF' },
-  bubbleThem: { alignSelf: 'flex-start', backgroundColor: '#f7b543ff' },
-  bubbleSystem: { alignSelf: 'center', backgroundColor: '#FFF4E5', borderWidth: 1, borderColor: '#FFE0B2' },
-  bubbleText: { color: '#fff', fontSize: 15 },
-  bubbleMeText: { color: '#fff' },
-  bubbleSystemText: { color: '#8E5C00', fontSize: 13, textAlign: 'center' },
-  messageTime: {
-    fontSize: 10,
-    color: '#fff8',
-    marginTop: 4,
-    opacity: 0.8,
-    alignSelf: 'flex-end',
-  },
-
-  // Composer
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: '#EFEFF4',
-    backgroundColor: '#fff',
-  },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#E5E5EA',
-    borderRadius: 22,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    backgroundColor: '#fff',
-    maxHeight: 100,
-  },
-  sendBtn: {
-    backgroundColor: '#007AFF',
+  aiInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', marginLeft: 12 },
+  avatar: {
     width: 44,
     height: 44,
     borderRadius: 22,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  avatarText: { color: '#fff', fontSize: 18, fontWeight: 'bold' },
+  aiName: { fontSize: 17, fontWeight: '700', color: '#000' },
+  aiStatus: { fontSize: 13, color: '#4CAF50', marginTop: 2 },
+  chatContainer: { paddingHorizontal: 16, paddingVertical: 20, paddingBottom: 20 },
+  messageBubble: {
+    maxWidth: '82%',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  userBubble: {
+    alignSelf: 'flex-end',
+    backgroundColor: '#007AFF',
+    borderBottomRightRadius: 4,
+  },
+  aiBubble: {
+    alignSelf: 'flex-start',
+    backgroundColor: '#fff',
+    borderBottomLeftRadius: 4,
+  },
+  aiLabel: { fontSize: 12, color: '#007AFF', fontWeight: '600', marginBottom: 4 },
+  userText: { color: '#fff', fontSize: 16, lineHeight: 22 },
+  aiText: { color: '#1a1a1a', fontSize: 16, lineHeight: 22 },
+  timestamp: { fontSize: 11, color: '#999', marginTop: 4, alignSelf: 'flex-end' },
+  typing: { color: '#666', fontStyle: 'italic', fontSize: 15 },
+  inputContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    alignItems: 'flex-end',
+  },
+  textInput: {
+    flex: 1,
+    backgroundColor: '#f2f2f7',
+    borderRadius: 22,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    maxHeight: 100,
+    marginRight: 10,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#E3F2FD',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sendBtnDisabled: { backgroundColor: '#ccc' },
+  sendButtonDisabled: { backgroundColor: '#f0f0f0' },
 });
